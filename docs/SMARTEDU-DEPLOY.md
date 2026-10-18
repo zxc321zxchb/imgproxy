@@ -4,8 +4,8 @@
 
 - 仓库：https://github.com/zxc321zxchb/imgproxy
 - 构建记录：https://github.com/zxc321zxchb/imgproxy/actions/workflows/image.yml
-- 镜像：`ghcr.io/zxc321zxchb/imgproxy:v4.0.16-smartedu.1`
-- 下载：https://github.com/zxc321zxchb/imgproxy/releases/tag/v4.0.16-smartedu.1
+- 镜像：`ghcr.io/zxc321zxchb/imgproxy:v4.0.16`
+- 下载：https://github.com/zxc321zxchb/imgproxy/releases/tag/v4.0.16
 - 架构：`linux/amd64`、`linux/arm64`，Docker 自动选择。
 
 此版本基于云效 `agent/imgproxy` 的 `master` 提交
@@ -15,7 +15,7 @@
 只有两个架构均通过容器验证后，才发布正式多架构标签。
 
 ```bash
-docker pull ghcr.io/zxc321zxchb/imgproxy:v4.0.16-smartedu.1
+docker pull ghcr.io/zxc321zxchb/imgproxy:v4.0.16
 ```
 
 生产固定版本或 digest；`latest` 随 master 构建更新。每次构建还提供 `sha-<完整Git提交>` 标签。

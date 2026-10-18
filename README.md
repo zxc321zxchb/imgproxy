@@ -3,7 +3,7 @@
 SmartEdu 图片缩略图服务：**[部署说明、端口、资源与环境变量](docs/SMARTEDU-DEPLOY.md)** · [镜像及离线下载](https://github.com/zxc321zxchb/imgproxy/releases)
 
 ```bash
-docker pull ghcr.io/zxc321zxchb/imgproxy:v4.0.16-smartedu.1
+docker pull ghcr.io/zxc321zxchb/imgproxy:v4.0.16
 ```
 
 <p align="center">

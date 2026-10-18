@@ -1,6 +1,6 @@
 services:
   imgproxy:
-    image: ghcr.io/zxc321zxchb/imgproxy:v4.0.16-smartedu.1
+    image: ghcr.io/zxc321zxchb/imgproxy:v4.0.16
     restart: unless-stopped
     ports:
       - '${IMGPROXY_HOST_IP:-127.0.0.1}:${IMGPROXY_HOST_PORT:-8080}:8080'

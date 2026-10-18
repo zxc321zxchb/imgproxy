@@ -1,6 +1,6 @@
 SmartEdu 图片缩略图服务，基于云效 agent/imgproxy master 的源代码（imgproxy 4.0.16，原始提交 0040eb67c85108bec5ce14e49d0ddeb9270ef840）。
 
-- 镜像：`ghcr.io/zxc321zxchb/imgproxy:v4.0.16-smartedu.1`
+- 镜像：`ghcr.io/zxc321zxchb/imgproxy:v4.0.16`
 - 平台：linux/amd64、linux/arm64，Docker 自动选择。
 - 部署、环境变量、网络和资源建议：[部署说明](https://github.com/zxc321zxchb/imgproxy/blob/master/docs/SMARTEDU-DEPLOY.md)
 - 唯一默认服务端口：TCP 8080，仅后端内部访问。
@@ -10,7 +10,7 @@ SmartEdu 图片缩略图服务，基于云效 agent/imgproxy master 的源代码
 在线拉取：
 
 ```bash
-docker pull ghcr.io/zxc321zxchb/imgproxy:v4.0.16-smartedu.1
+docker pull ghcr.io/zxc321zxchb/imgproxy:v4.0.16
 ```
 
 无法访问 GHCR 时，下载对应架构的压缩镜像及 SHA256 文件：
