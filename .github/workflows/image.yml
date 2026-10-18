@@ -1,0 +1,143 @@
+name: Build and publish imgproxy
+
+on:
+  push:
+    branches: [master]
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: image-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4.0.0
+      - uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4.1.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Image name
+        id: image
+        env:
+          ARCH: ${{ matrix.arch }}
+        run: |
+          image="ghcr.io/${GITHUB_REPOSITORY,,}"
+          echo "name=$image" >> "$GITHUB_OUTPUT"
+          echo "tag=$image:build-$GITHUB_SHA-$ARCH" >> "$GITHUB_OUTPUT"
+      - name: Build from source
+        uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f # v7.1.0
+        with:
+          context: .
+          file: docker/Dockerfile
+          platforms: linux/${{ matrix.arch }}
+          load: true
+          tags: ${{ steps.image.outputs.tag }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.licenses=Apache-2.0
+          cache-from: type=gha,scope=imgproxy-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=imgproxy-${{ matrix.arch }}
+          provenance: false
+      - name: Verify health, signed S3 thumbnail, dimensions and signature rejection
+        env:
+          IMAGE: ${{ steps.image.outputs.tag }}
+        run: python3 scripts/smoke-image.py "$IMAGE"
+      - name: Push verified image
+        env:
+          IMAGE: ${{ steps.image.outputs.tag }}
+        run: docker push "$IMAGE"
+      - name: Export offline image
+        env:
+          IMAGE: ${{ steps.image.outputs.tag }}
+          ARCH: ${{ matrix.arch }}
+          RELEASE_IMAGE: ${{ steps.image.outputs.name }}
+        run: |
+          # Offline imports use the same stable tag as the deployment examples.
+          release_tag="sha-$GITHUB_SHA"
+          if [[ "$GITHUB_REF_TYPE" == tag ]]; then release_tag="$GITHUB_REF_NAME"; fi
+          docker tag "$IMAGE" "$RELEASE_IMAGE:$release_tag"
+          docker save "$RELEASE_IMAGE:$release_tag" | gzip -1 > "imgproxy-linux-$ARCH.tar.gz"
+          sha256sum "imgproxy-linux-$ARCH.tar.gz" > "imgproxy-linux-$ARCH.tar.gz.sha256"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: imgproxy-linux-${{ matrix.arch }}
+          path: |
+            imgproxy-linux-*.tar.gz
+            imgproxy-linux-*.tar.gz.sha256
+          compression-level: 0
+          retention-days: 7
+
+  publish:
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      packages: write
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4.0.0
+      - uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4.1.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Publish multi-platform manifest
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          image="ghcr.io/${GITHUB_REPOSITORY,,}"
+          tags=(-t "$image:sha-$GITHUB_SHA")
+          if [[ "$GITHUB_REF_TYPE" == tag ]]; then
+            tags+=(-t "$image:$GITHUB_REF_NAME")
+          elif [[ "$GITHUB_REF_NAME" == master ]]; then
+            tags+=(-t "$image:latest")
+          fi
+          docker buildx imagetools create "${tags[@]}" \
+            "$image:build-$GITHUB_SHA-amd64" \
+            "$image:build-$GITHUB_SHA-arm64"
+          docker buildx imagetools inspect "$image:sha-$GITHUB_SHA" | tee manifest.txt
+          {
+            echo '### Published image'
+            echo "\`$image:sha-$GITHUB_SHA\`"
+            echo 'Platforms: linux/amd64, linux/arm64. Each image passed the S3 thumbnail smoke test.'
+            echo '```text'
+            cat manifest.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/download-artifact@v4
+        if: github.ref_type == 'tag'
+        with:
+          pattern: imgproxy-linux-*
+          merge-multiple: true
+          path: release-assets
+      - name: Publish offline release assets
+        if: github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" release-assets/* \
+            --title "imgproxy $GITHUB_REF_NAME" \
+            --notes-file docs/RELEASE-NOTES.md \
+            --verify-tag

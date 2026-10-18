@@ -1,0 +1,114 @@
+# Apply in the SAME namespace as smartedu-media after creating imgproxy-secrets.
+# See docs/SMARTEDU-DEPLOY.md. This file contains no environment credentials.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: imgproxy
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: imgproxy
+  template:
+    metadata:
+      labels:
+        app: imgproxy
+    spec:
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 45
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        runAsGroup: 999
+        fsGroup: 999
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: imgproxy
+          image: ghcr.io/zxc321zxchb/imgproxy:v4.0.16-smartedu.1
+          ports:
+            - name: http
+              containerPort: 8080
+          envFrom:
+            - secretRef:
+                name: imgproxy-secrets
+          env:
+            - name: IMGPROXY_BIND
+              value: ':8080'
+            - name: IMGPROXY_USE_S3
+              value: 'true'
+            - name: IMGPROXY_S3_ENDPOINT_USE_PATH_STYLE
+              value: 'true'
+            - name: AWS_EC2_METADATA_DISABLED
+              value: 'true'
+            - name: IMGPROXY_WORKERS
+              value: '2'
+            - name: IMGPROXY_REQUESTS_QUEUE_SIZE
+              value: '16'
+            - name: IMGPROXY_MAX_SRC_RESOLUTION
+              value: '50'
+            - name: IMGPROXY_MAX_SRC_FILE_SIZE
+              value: '20971520'
+            - name: IMGPROXY_MAX_ANIMATION_FRAMES
+              value: '1'
+            - name: IMGPROXY_MAX_RESULT_DIMENSION
+              value: '2048'
+            - name: IMGPROXY_DOWNLOAD_TIMEOUT
+              value: '10'
+            - name: IMGPROXY_TIMEOUT
+              value: '20'
+          resources:
+            requests:
+              cpu: 500m
+              memory: 512Mi
+            limits:
+              cpu: '2'
+              memory: 2Gi
+          startupProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 2
+            failureThreshold: 30
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 20
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: font-cache
+              mountPath: /var/cache/fontconfig
+      volumes:
+        - name: tmp
+          emptyDir:
+            medium: Memory
+            sizeLimit: 256Mi
+        - name: font-cache
+          emptyDir:
+            medium: Memory
+            sizeLimit: 16Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: imgproxy
+spec:
+  type: ClusterIP
+  selector:
+    app: imgproxy
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http

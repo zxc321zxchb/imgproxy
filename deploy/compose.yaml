@@ -1,0 +1,46 @@
+services:
+  imgproxy:
+    image: ghcr.io/zxc321zxchb/imgproxy:v4.0.16-smartedu.1
+    restart: unless-stopped
+    ports:
+      - '${IMGPROXY_HOST_IP:-127.0.0.1}:${IMGPROXY_HOST_PORT:-8080}:8080'
+    environment:
+      IMGPROXY_BIND: ':8080'
+      IMGPROXY_KEY: '${IMGPROXY_KEY:?Set IMGPROXY_KEY in .env}'
+      IMGPROXY_SALT: '${IMGPROXY_SALT:?Set IMGPROXY_SALT in .env}'
+      IMGPROXY_USE_S3: 'true'
+      IMGPROXY_S3_ENDPOINT: '${IMGPROXY_S3_ENDPOINT:?Set storage endpoint}'
+      IMGPROXY_S3_REGION: '${IMGPROXY_S3_REGION:-us-east-1}'
+      IMGPROXY_S3_ENDPOINT_USE_PATH_STYLE: 'true'
+      IMGPROXY_S3_ALLOWED_BUCKETS: '${IMGPROXY_S3_ALLOWED_BUCKETS:?Set source bucket}'
+      IMGPROXY_ALLOWED_SOURCES: '${IMGPROXY_ALLOWED_SOURCES:?Set allowed S3 URL prefix}'
+      AWS_ACCESS_KEY_ID: '${AWS_ACCESS_KEY_ID:?Set storage access key}'
+      AWS_SECRET_ACCESS_KEY: '${AWS_SECRET_ACCESS_KEY:?Set storage secret key}'
+      AWS_EC2_METADATA_DISABLED: 'true'
+      IMGPROXY_WORKERS: '2'
+      IMGPROXY_REQUESTS_QUEUE_SIZE: '16'
+      IMGPROXY_MAX_SRC_RESOLUTION: '50'
+      IMGPROXY_MAX_SRC_FILE_SIZE: '20971520'
+      IMGPROXY_MAX_ANIMATION_FRAMES: '1'
+      IMGPROXY_MAX_RESULT_DIMENSION: '2048'
+      IMGPROXY_DOWNLOAD_TIMEOUT: '10'
+      IMGPROXY_TIMEOUT: '20'
+    cpus: 2
+    mem_limit: 2g
+    read_only: true
+    tmpfs:
+      - /tmp:size=256m,mode=1777
+      - /var/cache/fontconfig:size=16m,mode=1777
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    healthcheck:
+      test: [CMD, imgproxy, health]
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'

@@ -15,3 +15,5 @@ k6/*.json
 .devcontainer/images
 .claude
 .lycheecache
+__pycache__/
+*.pyc
